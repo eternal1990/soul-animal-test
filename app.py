@@ -111,7 +111,7 @@ if st.button("🔮 献祭选择，显形真身"):
     with st.spinner("STEP 1/2: AI 正在重构你的灵魂数据..."):
         try:
             # ⚠️ 确保这里是你跑通的模型名 (例如 'gemini-pro' 或 'gemini-1.5-flash')
-            model = genai.GenerativeModel('gemini-pro') 
+            model = genai.GenerativeModel('gemini-3-flash-preview') 
             user_profile = "\n".join(answers)
             prompt = f"""
             你是一位暗黑心理学家。根据用户的选择：{user_profile}
