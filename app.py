@@ -3,9 +3,8 @@ import google.generativeai as genai
 import json
 import time
 import plotly.graph_objects as go
-import replicate
+import requests  # <--- 新的请求库在这里
 import os
-
 # --- 页面配置 ---
 st.set_page_config(page_title="内在野兽 Soul Animal", page_icon="🕸️", layout="centered")
 
@@ -56,11 +55,9 @@ else:
     st.error("这是线上环境，请在 Streamlit Secrets 中配置 GEMINI_API_KEY")
     st.stop()
 
-# 2. 配置 Replicate (只需要设置环境变量，库会自动读取)
-if "REPLICATE_API_TOKEN" in st.secrets:
-    os.environ["REPLICATE_API_TOKEN"] = st.secrets["REPLICATE_API_TOKEN"]
-else:
-    st.warning("⚠️ 未检测到画图密钥 (REPLICATE_API_TOKEN)。本次将只生成文字，无法生成灵魂写真。")
+# 2. 配置 硅基流动 (SiliconFlow) 画图密钥检查
+if "SILICONFLOW_API_KEY" not in st.secrets:
+    st.warning("⚠️ 未检测到画图密钥 (SILICONFLOW_API_KEY)。本次将只生成文字，无法生成灵魂图腾。")
 
 # --- 标题区 ---
 st.title("👁️ 你的灵魂囚禁在什么野兽体内？")
