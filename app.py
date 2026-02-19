@@ -165,7 +165,7 @@ elif st.session_state.page == 3:
 elif st.session_state.page == 4:
     with st.spinner("正在通过星界连接你的潜意识..."):
         try:
-            model = genai.GenerativeModel('gemini-3-flash-preview') 
+            model = genai.GenerativeModel('models/gemini-2.5-flash') 
             user_profile = "\n".join(list(st.session_state.answers.values()))
             
             # --- Prompt 调整：从暗黑转为空灵/智性/治愈 ---
