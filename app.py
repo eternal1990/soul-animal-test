@@ -102,7 +102,8 @@ st.title("✨ 灵魂显影测试")
 st.markdown("<p style='text-align: center; color: #7f848e; font-size: 0.9rem; margin-bottom: 20px;'>测一测你内在的真实图腾</p>", unsafe_allow_html=True)
 
 # 进度条
-progress_bar = st.progress(st.session_state.page / 3)
+# 进度条 (使用 min 函数，确保进度最大不会超过 1.0 即 100%)
+progress_bar = st.progress(min(st.session_state.page / 3, 1.0))
 
 # ================= 第 1 页 (Q1, Q2) =================
 if st.session_state.page == 1:
