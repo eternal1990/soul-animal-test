@@ -144,34 +144,25 @@ if st.button("🔮 献祭选择，显形真身"):
             st.error(f"文字召唤失败：{str(e)}")
             st.stop()
 
-    # 2. 图片生成阶段
-    if "REPLICATE_API_TOKEN" in os.environ and data.get('image_prompt'):
-        with st.spinner("STEP 2/2: 正在虚空中绘制你的灵魂图腾 (约需10-15秒)..."):
+
+    # 2. 图片生成阶段 (使用免费的 Pollinations 引擎)
+    if data.get('image_prompt'):
+        with st.spinner("STEP 2/2: 正在虚空中薅羊毛绘制灵魂图腾 (约需5-10秒)..."):
             try:
-                # 调用 Stable Diffusion XL 模型
-                output = replicate.run(
-                    "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
-                    input={
-                        "prompt": data.get('image_prompt'),
-                        "width": 768,
-                        "height": 768,
-                        "refine": "expert_ensemble_refiner",
-                        "scheduler": "K_EULER_ANCESTRAL",
-                        "guidance_scale": 7.5,
-                        "high_noise_frac": 0.8
-                    }
-                )
-                image_url = output[0]
-                st.image(image_url, caption="你的 Rococo 灵魂图腾 (长按保存)", use_column_width=True)
-                # 给图片加个金色边框样式
+                import urllib.parse
+                # 将 Gemini 写的绝美 Prompt 转换为 URL 安全格式
+                safe_prompt = urllib.parse.quote(data.get('image_prompt'))
+                
+                # 直接调用 Pollinations 的魔法链接，加上高清和无水印参数
+                image_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=768&height=768&nologo=true"
+                
+                st.image(image_url, caption="你的 Rococo 灵魂图腾 (长按保存)", use_container_width=True)
+                
+                # 依然保留霸气的金色边框
                 st.markdown("""<style>.stImage > img {border: 3px solid #D4AF37; border-radius: 10px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);}</style>""", unsafe_allow_html=True)
 
             except Exception as e:
-                st.error(f"绘图失败，虚空能量不足：{str(e)}")
-                st.info("提示：请检查 Streamlit Secrets 中的 REPLICATE_API_TOKEN 是否配置正确。")
-    else:
-        st.warning("未配置画图密钥，跳过灵魂写真生成。")
-
+                st.error(f"绘图失败，魔法链接失效：{str(e)}")
     # 3. 展示剩余文字分析
     st.markdown(f"""
         <p style='text-align: left; line-height: 1.8; color: #ddd; margin-top: 20px;'>{data.get('analysis')}</p>
