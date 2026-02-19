@@ -145,24 +145,31 @@ if st.button("🔮 献祭选择，显形真身"):
             st.stop()
 
 
-    # 2. 图片生成阶段 (使用免费的 Pollinations 引擎)
+   # 2. 图片生成阶段 (使用免费的 Pollinations 引擎 - HTML前端渲染版)
     if data.get('image_prompt'):
-        with st.spinner("STEP 2/2: 正在虚空中薅羊毛绘制灵魂图腾 (约需5-10秒)..."):
+        with st.spinner("STEP 2/2: 虚空画师正在作画，请耐心等待 10-20 秒..."):
             try:
                 import urllib.parse
-                # 将 Gemini 写的绝美 Prompt 转换为 URL 安全格式
+                import random
+                
+                # 1. 转换 Prompt
                 safe_prompt = urllib.parse.quote(data.get('image_prompt'))
                 
-                # 直接调用 Pollinations 的魔法链接，加上高清和无水印参数
-                image_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=768&height=768&nologo=true"
+                # 2. 加入一个随机种子防止缓存，确保每次都是新图
+                seed = random.randint(1, 10000)
+                image_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=768&height=768&nologo=true&seed={seed}"
                 
-                st.image(image_url, caption="你的 Rococo 灵魂图腾 (长按保存)", use_container_width=True)
-                
-                # 依然保留霸气的金色边框
-                st.markdown("""<style>.stImage > img {border: 3px solid #D4AF37; border-radius: 10px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);}</style>""", unsafe_allow_html=True)
+                # 3. 关键修复：使用 HTML 直接注入，让浏览器去耐心加载图片
+                st.markdown(f"""
+                <div style="border: 3px solid #D4AF37; border-radius: 10px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.3); padding: 5px; background: #000; margin-top: 20px;">
+                    <img src="{image_url}" style="width: 100%; border-radius: 5px; display: block;" alt="灵魂图腾加载中..." />
+                    <p style="text-align: center; color: #888; font-style: italic; margin-top: 10px; font-size: 0.9em;">你的 Rococo 灵魂图腾 (长按或右键保存)</p>
+                </div>
+                """, unsafe_allow_html=True)
 
             except Exception as e:
-                st.error(f"绘图失败，魔法链接失效：{str(e)}")
+                st.error(f"绘图链接生成失败：{str(e)}")
+                
     # 3. 展示剩余文字分析
     st.markdown(f"""
         <p style='text-align: left; line-height: 1.8; color: #ddd; margin-top: 20px;'>{data.get('analysis')}</p>
