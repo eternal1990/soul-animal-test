@@ -145,30 +145,45 @@ if st.button("🔮 献祭选择，显形真身"):
             st.stop()
 
 
-   # 2. 图片生成阶段 (使用免费的 Pollinations 引擎 - HTML前端渲染版)
-    if data.get('image_prompt'):
-        with st.spinner("STEP 2/2: 虚空画师正在作画，请耐心等待 10-20 秒..."):
+# 2. 图片生成阶段 (使用 硅基流动 SiliconFlow API + FLUX 模型)
+    if "SILICONFLOW_API_KEY" in st.secrets and data.get('image_prompt'):
+        with st.spinner("STEP 2/2: 正在调动硅基算力，使用 FLUX 模型渲染灵魂图腾 (约需 5-10 秒)..."):
             try:
-                import urllib.parse
-                import random
+                import requests
                 
-                # 1. 转换 Prompt
-                safe_prompt = urllib.parse.quote(data.get('image_prompt'))
+                url = "https://api.siliconflow.cn/v1/images/generations"
+                headers = {
+                    "Authorization": f"Bearer {st.secrets['SILICONFLOW_API_KEY']}",
+                    "Content-Type": "application/json"
+                }
                 
-                # 2. 加入一个随机种子防止缓存，确保每次都是新图
-                seed = random.randint(1, 10000)
-                image_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=768&height=768&nologo=true&seed={seed}"
+                # 在 Prompt 前加上强制的风格前缀，确保出图味道绝对纯正
+                enhanced_prompt = f"Dark fantasy masterpiece, Rococo Noir style, {data.get('image_prompt')}"
                 
-                # 3. 关键修复：使用 HTML 直接注入，让浏览器去耐心加载图片
-                st.markdown(f"""
-                <div style="border: 3px solid #D4AF37; border-radius: 10px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.3); padding: 5px; background: #000; margin-top: 20px;">
-                    <img src="{image_url}" style="width: 100%; border-radius: 5px; display: block;" alt="灵魂图腾加载中..." />
-                    <p style="text-align: center; color: #888; font-style: italic; margin-top: 10px; font-size: 0.9em;">你的 Rococo 灵魂图腾 (长按或右键保存)</p>
-                </div>
-                """, unsafe_allow_html=True)
+                payload = {
+                    "model": "black-forest-labs/FLUX.1-schnell", # FLUX 极速版模型
+                    "prompt": enhanced_prompt,
+                    "image_size": "1024x1024", # FLUX 擅长高分辨率
+                    "batch_size": 1
+                }
+                
+                response = requests.post(url, json=payload, headers=headers)
+                result = response.json()
+                
+                # 解析返回的 JSON 获取图片链接
+                if "images" in result and len(result["images"]) > 0:
+                    image_url = result["images"][0]["url"]
+                    st.image(image_url, caption="你的 Rococo 灵魂图腾 (长按或右键保存)", use_container_width=True)
+                    
+                    # 依然保留霸气的金色边框
+                    st.markdown("""<style>.stImage > img {border: 3px solid #D4AF37; border-radius: 10px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);}</style>""", unsafe_allow_html=True)
+                else:
+                    st.error(f"硅基矩阵返回异常，可能是触发了安全审核或余额不足: {result}")
 
             except Exception as e:
-                st.error(f"绘图链接生成失败：{str(e)}")
+                st.error(f"绘图失败，接口调用异常：{str(e)}")
+    else:
+        st.warning("未检测到硅基流动密钥，跳过灵魂写真生成。")
                 
     # 3. 展示剩余文字分析
     st.markdown(f"""
