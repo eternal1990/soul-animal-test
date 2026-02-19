@@ -68,7 +68,7 @@ with st.sidebar:
         st.success("已检测到炼金密钥，无需手动输入。")
     else:
         # 如果后台没配，才显示输入框 (方便你自己本地测试)
-        api_key = st.text_input("AIzaSyDOeniM3UZKZWQZM25BT5yPgqQIygiz5f4", type="password")
+        api_key = st.text_input("输入 Gemini API Key", type="password")
 
     if api_key:
         genai.configure(api_key=api_key)
