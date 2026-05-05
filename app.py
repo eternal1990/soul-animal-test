@@ -1,8 +1,18 @@
 import streamlit as st
 import google.generativeai as genai
-import json
 import plotly.graph_objects as go
-import requests
+
+from soul_animal_helpers import (
+    DEFAULT_TEXT_MODEL_ID,
+    TEXT_MODEL_OPTIONS,
+    build_seedance_video_prompt,
+    escape_profile_for_html,
+    extract_json_payload,
+    generate_openai_compatible_chat_text,
+    generate_siliconflow_image_url,
+    get_text_model_option,
+    validate_soul_profile,
+)
 
 # --- 页面配置 ---
 st.set_page_config(page_title="灵魂潜行", page_icon="✨", layout="centered")
@@ -58,12 +68,31 @@ if 'page' not in st.session_state:
 if 'answers' not in st.session_state:
     st.session_state.answers = {}
 
-# --- 密钥配置 ---
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-else:
-    st.error("请在 Streamlit Secrets 中配置 GEMINI_API_KEY")
-    st.stop()
+# --- 模型选择 ---
+text_model_ids = list(TEXT_MODEL_OPTIONS.keys())
+selected_text_model_id = st.sidebar.selectbox(
+    "文本模型",
+    text_model_ids,
+    index=text_model_ids.index(DEFAULT_TEXT_MODEL_ID),
+    format_func=lambda model_id: TEXT_MODEL_OPTIONS[model_id]["label"],
+)
+selected_text_model = get_text_model_option(selected_text_model_id)
+
+visual_output_options = {
+    "siliconflow_flux": "SiliconFlow FLUX 图片",
+    "seedance_prompt": "Seedance 视频 Prompt",
+}
+selected_visual_output = st.sidebar.selectbox(
+    "视觉输出",
+    list(visual_output_options.keys()),
+    format_func=lambda output_id: visual_output_options[output_id],
+)
+
+missing_text_secret = selected_text_model["secret_name"] not in st.secrets
+if missing_text_secret:
+    st.sidebar.warning(f"缺少 {selected_text_model['secret_name']}，生成结果前请先配置。")
+if selected_visual_output == "siliconflow_flux" and "SILICONFLOW_API_KEY" not in st.secrets:
+    st.sidebar.info("未配置 SILICONFLOW_API_KEY 时会跳过图片生成。")
 
 # --- 题库 ---
 questions = [
@@ -165,7 +194,6 @@ elif st.session_state.page == 3:
 elif st.session_state.page == 4:
     with st.spinner("正在通过星界连接你的潜意识..."):
         try:
-            model = genai.GenerativeModel('models/gemini-2.5-flash') 
             user_profile = "\n".join(list(st.session_state.answers.values()))
             
             # --- Prompt 调整：从暗黑转为空灵/智性/治愈 ---
@@ -181,42 +209,53 @@ elif st.session_state.page == 4:
             7. "stats": {{"独立性": int, "洞察力": int, "边界感": int, "精神力": int, "共情力": int, "掌控欲": int}} (数值0-100)。
             8. "image_prompt": 一段用于 FLUX 模型的英文提示词，描述这只动物。风格要求：Ethereal fantasy, majestic, highly detailed, luminous, glowing crystal elements, cinematic lighting, Studio Ghibli meets Tarot card art, masterpiece, 8k.
             """
-            response = model.generate_content(prompt)
-            text_json = response.text.replace('```json', '').replace('```', '').strip()
-            data = json.loads(text_json)
+            if missing_text_secret:
+                st.error(f"请在 Streamlit Secrets 中配置 {selected_text_model['secret_name']}")
+                st.stop()
+
+            if selected_text_model["provider"] == "gemini":
+                genai.configure(api_key=st.secrets[selected_text_model["secret_name"]])
+                model = genai.GenerativeModel(selected_text_model["model"])
+                response_text = model.generate_content(prompt).text
+            else:
+                response_text = generate_openai_compatible_chat_text(
+                    selected_text_model["base_url"],
+                    selected_text_model["model"],
+                    st.secrets[selected_text_model["secret_name"]],
+                    prompt,
+                )
+
+            data = validate_soul_profile(extract_json_payload(response_text))
+            safe_data = escape_profile_for_html(data)
             
             # 展示文字框架
             st.markdown(f"""
             <div class='result-container'>
-                <h1 style='color: #E5C07B; margin-bottom: 5px;'>{data.get('animal')}</h1>
-                <p style='font-style: italic; color: #abb2bf; margin-bottom: 20px;'>“{data.get('quote')}”</p>
+                <h1 style='color: #E5C07B; margin-bottom: 5px;'>{safe_data['animal']}</h1>
+                <p style='font-style: italic; color: #abb2bf; margin-bottom: 20px;'>“{safe_data['quote']}”</p>
                 <div style='margin-bottom: 20px;'>
-                    {' '.join([f'<span class="tag">#{k}</span>' for k in data.get('keywords', [])])}
+                    {' '.join([f'<span class="tag">#{k}</span>' for k in safe_data['keywords']])}
                 </div>
             """, unsafe_allow_html=True)
-            st.plotly_chart(plot_radar_chart(data.get('stats', {})), use_container_width=True)
+            st.plotly_chart(plot_radar_chart(data['stats']), use_container_width=True)
 
-            # 调用硅基流动生成图片
-            if "SILICONFLOW_API_KEY" in st.secrets and data.get('image_prompt'):
-                url = "https://api.siliconflow.cn/v1/images/generations"
-                headers = {"Authorization": f"Bearer {st.secrets['SILICONFLOW_API_KEY']}", "Content-Type": "application/json"}
-                # 强化空灵神圣的画风
-                enhanced_prompt = f"Masterpiece, breathtaking ethereal fantasy art, majestic, luminous, {data.get('image_prompt')}"
-                payload = {"model": "black-forest-labs/FLUX.1-schnell", "prompt": enhanced_prompt, "image_size": "1024x1024", "batch_size": 1}
-                
-                res = requests.post(url, json=payload, headers=headers)
-                res_data = res.json()
-                
-                if "images" in res_data:
-                    st.image(res_data["images"][0]["url"], caption="你的灵魂图腾 (长按保存)", use_container_width=True)
+            # 调用视觉模型或输出视频 prompt
+            if selected_visual_output == "siliconflow_flux" and "SILICONFLOW_API_KEY" in st.secrets and data["image_prompt"]:
+                try:
+                    image_url = generate_siliconflow_image_url(data["image_prompt"], st.secrets["SILICONFLOW_API_KEY"])
+                    st.image(image_url, caption="你的灵魂图腾 (长按保存)", use_container_width=True)
                     st.markdown("""<style>.stImage > img {border: 2px solid #E5C07B; border-radius: 15px;}</style>""", unsafe_allow_html=True)
+                except RuntimeError as exc:
+                    st.warning(str(exc))
+            elif selected_visual_output == "seedance_prompt":
+                st.text_area("Seedance 视频 Prompt", build_seedance_video_prompt(data), height=150)
             
             # 深度分析
             st.markdown(f"""
-                <p style='text-align: left; line-height: 1.8; color: #d7dae0; margin-top: 25px; font-size: 1.05rem;'>{data.get('analysis')}</p>
+                <p style='text-align: left; line-height: 1.8; color: #d7dae0; margin-top: 25px; font-size: 1.05rem;'>{safe_data['analysis']}</p>
                 <div style='background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; margin-top: 20px; text-align: left;'>
-                    <p style='color: #abb2bf;'>🛡️ <b>表象面具：</b> <span style='color: #e6e9f0;'>{data.get('mask')}</span></p>
-                    <p style='color: #abb2bf;'>✨ <b>真实内核：</b> <span style='color: #e6e9f0;'>{data.get('shadow')}</span></p>
+                    <p style='color: #abb2bf;'>🛡️ <b>表象面具：</b> <span style='color: #e6e9f0;'>{safe_data['mask']}</span></p>
+                    <p style='color: #abb2bf;'>✨ <b>真实内核：</b> <span style='color: #e6e9f0;'>{safe_data['shadow']}</span></p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
